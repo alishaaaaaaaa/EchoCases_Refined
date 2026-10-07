@@ -206,3 +206,57 @@ def evaluate_clustering(true_labels, pred_labels, min_overlap=0.5):
         "min_overlap": min_overlap,
         "per_series": per_series,
     }
+
+
+def evaluate_retrieval(embeddings, true_labels, ks=(1, 5, 10)):
+    """
+    Score the similar-case search that feeds RAG.
+
+    Every case that belongs to a planted series is used as a query. All other
+    cases are ranked by cosine similarity, exactly as /api/similar and
+    /api/analyze do, and we check how many of the top-k results belong to the
+    query's own series.
+
+    precision@k: share of the top k results that are from the same series.
+    recall@k:    share of the query's other series members found in the top k.
+    MRR:         mean of 1 / rank of the first same-series result.
+    The random baseline is the precision@k you would expect from ranking cases
+    at random; the ceiling is the best precision@k possible given series sizes
+    (a series of 5 has only 4 other members, so precision@5 can be at most 0.8).
+    """
+    X = np.asarray(embeddings, dtype=float)
+    X = X / (np.linalg.norm(X, axis=1, keepdims=True) + 1e-12)
+    sims = X @ X.T
+    np.fill_diagonal(sims, -np.inf)
+    labels = np.array([t if t is not None else "" for t in true_labels], dtype=object)
+    n = len(labels)
+
+    queries = [i for i in range(n) if labels[i]]
+    totals = {f"precision@{k}": 0.0 for k in ks}
+    totals.update({f"recall@{k}": 0.0 for k in ks})
+    totals.update({f"ceiling_precision@{k}": 0.0 for k in ks})
+    mrr = random_p = 0.0
+    per_series = {}
+
+    for i in queries:
+        order = np.argsort(-sims[i])
+        same = labels[order] == labels[i]
+        others = int((labels == labels[i]).sum()) - 1
+        for k in ks:
+            hits = int(same[:k].sum())
+            totals[f"precision@{k}"] += hits / k
+            totals[f"recall@{k}"] += hits / others if others else 0.0
+            totals[f"ceiling_precision@{k}"] += min(k, others) / k
+        first = np.argmax(same) + 1 if same.any() else None
+        mrr += 1.0 / first if first else 0.0
+        random_p += others / (n - 1)
+        per_series.setdefault(labels[i], []).append(int(same[:5].sum()) / 5)
+
+    q = len(queries)
+    result = {k: round(v / q, 3) for k, v in totals.items()}
+    result["mrr"] = round(mrr / q, 3)
+    result["random_precision"] = round(random_p / q, 3)
+    result["queries"] = q
+    result["per_series_precision@5"] = {s: round(sum(v) / len(v), 3)
+                                        for s, v in sorted(per_series.items())}
+    return result

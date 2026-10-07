@@ -14,6 +14,8 @@ Usage (from backend/):
     python evaluate_clustering.py --seeds 5      # average over 5 regenerated datasets
     python evaluate_clustering.py --compare      # pick the best pipeline settings
                                                  # and save cluster_config.json
+    python evaluate_clustering.py --retrieval    # score the similar-case search
+                                                 # that feeds RAG (precision@k)
 
 --compare chooses settings on tuning datasets (seeds 0..N-1) and then reports
 the chosen settings and the default baseline on held-out datasets
@@ -39,6 +41,7 @@ from clustering import (
     case_texts,
     cluster_embeddings,
     evaluate_clustering,
+    evaluate_retrieval,
     ground_truth_labels,
     load_config,
 )
@@ -250,14 +253,49 @@ def run_compare(n, emb):
     return result
 
 
+def run_retrieval(n, offset, emb, config):
+    modes = [config["text"]] + [m for m in ("narrative", "narrative+fields") if m != config["text"]]
+    seeds = range(offset, offset + n)
+    print(f"Retrieval on seeds {seeds.start}-{seeds.stop - 1}: each series case is a query, "
+          f"all other cases are ranked by cosine similarity.\n")
+    data = datasets(seeds)
+    out = {"seeds": list(seeds), "by_text_mode": {}}
+    for mode in modes:
+        runs = [evaluate_retrieval(emb.get(seed, df, mode), truth) for seed, df, truth in data]
+        keys = [k for k in runs[0] if k not in ("per_series_precision@5", "queries")]
+        mean = {k: round(sum(r[k] for r in runs) / n, 3) for k in keys}
+        series = sorted(runs[0]["per_series_precision@5"])
+        mean["per_series_precision@5"] = {
+            s: round(sum(r["per_series_precision@5"][s] for r in runs) / n, 3) for s in series}
+        out["by_text_mode"][mode] = mean
+
+        tag = "  (used by the app)" if mode == config["text"] else ""
+        print(f"--- embedding text: {mode}{tag} ---")
+        print(f"  precision@1:  {mean['precision@1']:.3f}   (top result is from the same series)")
+        print(f"  precision@5:  {mean['precision@5']:.3f}   (ceiling {mean['ceiling_precision@5']:.3f}, "
+              f"random {mean['random_precision']:.3f})")
+        print(f"  recall@5:     {mean['recall@5']:.3f}")
+        print(f"  recall@10:    {mean['recall@10']:.3f}")
+        print(f"  MRR:          {mean['mrr']:.3f}")
+        if mode == config["text"]:
+            print("  precision@5 by series:")
+            for s, v in mean["per_series_precision@5"].items():
+                print(f"    {s:<24} {v:.2f}")
+        print()
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", default="cases.csv", help="dataset with planted series (default: cases.csv)")
     ap.add_argument("--sweep", action="store_true", help="also compare HDBSCAN settings on --csv")
     ap.add_argument("--seeds", type=int, default=0,
                     help="regenerate the dataset N times and average (with --compare: N per split)")
-    ap.add_argument("--seed-offset", type=int, default=0,
-                    help="first seed for --seeds (e.g. 1000 to use held-out datasets)")
+    ap.add_argument("--seed-offset", type=int, default=None,
+                    help="first seed for --seeds (default 0) or --retrieval (default 1000, "
+                         "the held-out datasets)")
+    ap.add_argument("--retrieval", action="store_true",
+                    help="score the similar-case search that feeds RAG")
     ap.add_argument("--compare", action="store_true",
                     help="choose the best pipeline settings and save cluster_config.json")
     ap.add_argument("--out", default="eval_results.json", help="where to write the JSON results")
@@ -267,10 +305,13 @@ def main():
     config = load_config()
     output = {"embedding_model": EMBEDDING_MODEL, "active_config": config}
 
-    if args.compare:
+    if args.retrieval:
+        offset = HELD_OUT_START if args.seed_offset is None else args.seed_offset
+        output["retrieval"] = run_retrieval(args.seeds or 5, offset, emb, config)
+    elif args.compare:
         output["compare"] = run_compare(args.seeds or 5, emb)
     elif args.seeds:
-        output["multi_seed"] = run_seeds(args.seeds, args.seed_offset, emb, config)
+        output["multi_seed"] = run_seeds(args.seeds, args.seed_offset or 0, emb, config)
     else:
         output.update(run_single(args.csv, emb, config, args.sweep))
 
