@@ -16,10 +16,11 @@ from dateutil import parser as date_parser
 from math import radians, cos, sin, asin, sqrt
 
 from clustering import (
-    HDBSCAN_PARAMS,
+    case_texts,
     cluster_embeddings,
     evaluate_clustering,
     ground_truth_labels,
+    load_config,
 )
 
 app = Flask(__name__, static_folder='../frontend/build', static_url_path='')
@@ -45,6 +46,11 @@ EMBEDDING_MODEL_NAME = 'all-MiniLM-L6-v2'
 print("Loading NLP embedding model...")
 embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
+# Embedding text and clustering settings (cluster_config.json if present,
+# written by `python evaluate_clustering.py --compare`)
+CLUSTER_CONFIG = load_config()
+print(f"Clustering settings: {CLUSTER_CONFIG}")
+
 # How many retrieved cases are put in front of Gemini (override with ?k=)
 RAG_TOP_K = 5
 # Narratives are truncated in the prompt to keep it bounded
@@ -59,8 +65,8 @@ def load_dataset(df):
     """Embed narratives and detect crime series. Used by startup and /api/upload."""
     global cases_df, embeddings
     cases_df = df.fillna('').reset_index(drop=True)
-    embeddings = embedding_model.encode(cases_df['narrative'].astype(str).tolist())
-    cases_df['cluster_id'] = cluster_embeddings(embeddings)
+    embeddings = embedding_model.encode(case_texts(cases_df, CLUSTER_CONFIG['text']))
+    cases_df['cluster_id'] = cluster_embeddings(embeddings, CLUSTER_CONFIG)
     num_clusters = len([c for c in cases_df['cluster_id'].unique() if c != -1])
     print(f"Loaded {len(cases_df)} cases, detected {num_clusters} crime series clusters")
     return num_clusters
@@ -381,7 +387,7 @@ def get_evaluation():
         return jsonify({"error": "Dataset has no ground-truth series labels"}), 404
 
     metrics = evaluate_clustering(truth, cases_df['cluster_id'].tolist())
-    metrics['hdbscan_params'] = HDBSCAN_PARAMS
+    metrics['cluster_config'] = CLUSTER_CONFIG
     metrics['embedding_model'] = EMBEDDING_MODEL_NAME
     return jsonify(metrics)
 

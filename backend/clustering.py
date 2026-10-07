@@ -6,24 +6,79 @@ the offline evaluation script run exactly the same algorithm with exactly the
 same parameters.
 """
 
+import json
+import os
 from collections import Counter
 
 import numpy as np
 from sklearn.cluster import HDBSCAN
+from sklearn.decomposition import PCA
 
-# One set of parameters, used everywhere. evaluate_clustering.py --sweep
-# reports how other values compare on the planted series.
-HDBSCAN_PARAMS = {"min_cluster_size": 3, "min_samples": 2}
+# Default pipeline settings. `python evaluate_clustering.py --compare` picks the
+# best settings on tuning datasets, checks them on fresh held-out datasets, and
+# writes them to cluster_config.json, which overrides these defaults for both
+# the app and the evaluation.
+DEFAULT_CONFIG = {
+    # What gets embedded: "narrative" (text only) or "narrative+fields"
+    # (category, weapon and entry method prepended to the narrative).
+    "text": "narrative",
+    # Reduce embeddings to this many dimensions with PCA before clustering
+    # (None = cluster the raw 384-dim embeddings).
+    "reduce_dims": None,
+    "min_cluster_size": 3,
+    "min_samples": 2,
+    "cluster_selection_method": "eom",
+}
+
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cluster_config.json")
+HDBSCAN_KEYS = ("min_cluster_size", "min_samples", "cluster_selection_method")
+
+
+def load_config():
+    """Active pipeline settings: defaults, overridden by cluster_config.json if present."""
+    config = dict(DEFAULT_CONFIG)
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH) as f:
+            config.update({k: v for k, v in json.load(f).items() if k in DEFAULT_CONFIG})
+    return config
+
+
+def case_texts(df, mode="narrative"):
+    """The text that is embedded for each case."""
+    narratives = df["narrative"].astype(str)
+    if mode == "narrative":
+        return narratives.tolist()
+    if mode == "narrative+fields":
+        texts = []
+        for (_, row), narrative in zip(df.iterrows(), narratives):
+            parts = []
+            for col, label in (("category", "Category"), ("weapon", "Weapon"),
+                               ("entry_method", "Entry method")):
+                value = str(row.get(col, "")).strip()
+                if value and value.lower() != "unknown":
+                    parts.append(f"{label}: {value}.")
+            texts.append(" ".join(parts + [narrative]))
+        return texts
+    raise ValueError(f"Unknown text mode: {mode}")
+
+
+def cluster_embeddings(embeddings, config=None, **overrides):
+    """
+    Optionally reduce dimensions with PCA, then run HDBSCAN.
+    Returns one label per case (-1 = noise).
+    """
+    config = {**(config or load_config()), **overrides}
+    X = np.asarray(embeddings, dtype=float)
+    dims = config.get("reduce_dims")
+    if dims and dims < min(X.shape):
+        X = PCA(n_components=dims, random_state=0).fit_transform(X)
+    params = {k: config[k] for k in HDBSCAN_KEYS if k in config}
+    return HDBSCAN(**params).fit_predict(X)
+
 
 # Tags that every generated case carries; anything else in the tags column is
 # the name of the planted series the case belongs to.
 GENERIC_TAGS = {"cold_case", "unsolved", ""}
-
-
-def cluster_embeddings(embeddings, **overrides):
-    """Run HDBSCAN on narrative embeddings. Returns one label per case (-1 = noise)."""
-    params = {**HDBSCAN_PARAMS, **overrides}
-    return HDBSCAN(**params).fit_predict(np.asarray(embeddings))
 
 
 def ground_truth_labels(df):

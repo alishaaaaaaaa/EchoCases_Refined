@@ -223,49 +223,183 @@ CRIME_SERIES = [
     }
 ]
 
-# Additional random cold case templates for variety
-RANDOM_CASE_TEMPLATES = [
-    {
-        "category": "homicide",
-        "narratives": [
-            "Unidentified remains discovered by construction crew at development site. Victim appears to be male, 30-50 years old. Skeletal condition indicates death occurred 5-15 years ago. Cause of death: gunshot wound to chest. No matching missing persons.",
-            "Body of male, approximately 45 years old, recovered from water treatment facility. Victim weighted down with concrete blocks. Death estimated 1-2 months prior. No identification. Distinctive surgical scar on abdomen.",
-            "Female victim found in abandoned building by urban explorers. Deceased appears to be 25-35, death occurred 1-2 weeks prior. Multiple stab wounds. Scene staged to look like overdose. Identity unknown.",
-            "Remains discovered in shallow grave at closed campground. Victim is male, 20-30 years old. Blunt force trauma to skull. Personal effects recovered include class ring from out-of-state university.",
-            "Burned remains found in industrial incinerator. Dental records identify victim as missing businessman, 52. Declared missing 6 months ago. Insurance investigation ongoing. Partner of interest."
-        ]
+# Background (unlinked) cases. Each narrative is assembled from independent
+# random parts, so no two background cases share a narrative word for word.
+# Earlier versions drew 150 cases from 20 fixed narratives, which created
+# dozens of exact duplicates that any embedding model clusters together,
+# making the clustering evaluation measure duplicate detection instead of
+# series detection.
+SEXES = ["male", "female"]
+
+BACKGROUND_PARTS = {
+    "homicide": {
+        "found": [
+            "discovered by a construction crew at a development site",
+            "recovered from a drainage canal by city maintenance workers",
+            "found in a vacant apartment after neighbors reported an odor",
+            "located in a wooded lot behind a shopping plaza",
+            "pulled from a river near a boat launch",
+            "found in the trunk of a vehicle at an impound lot",
+            "discovered in a storage unit after rent went unpaid",
+            "found at the bottom of a stairwell in a parking structure",
+            "located in a field by a farmer clearing brush",
+            "found inside a motel room by housekeeping staff",
+        ],
+        "cause": [
+            "Cause of death: single gunshot wound",
+            "Cause of death: blunt force trauma to the head",
+            "Autopsy found multiple stab wounds",
+            "Medical examiner ruled death by asphyxiation",
+            "Cause of death undetermined due to decomposition",
+            "Death attributed to a fall, but injuries are inconsistent with that account",
+            "Toxicology found a lethal dose of an unprescribed sedative",
+        ],
+        "detail": [
+            "No identification was found on the body",
+            "Wallet and phone were still present",
+            "A distinctive tattoo is being circulated to the public",
+            "Dental records were used to make the identification",
+            "Victim had been reported missing by a sibling weeks earlier",
+            "A business partner was questioned and released",
+            "Surveillance footage from the area was overwritten before it could be pulled",
+            "Victim had recently changed jobs and moved to the area",
+            "Scene appeared to have been cleaned before discovery",
+        ],
+        "status": [
+            "No suspect has been identified.",
+            "Case went cold after initial leads were exhausted.",
+            "A person of interest left the state shortly after.",
+            "Evidence is awaiting modern DNA testing.",
+            "Family continues to press for a review.",
+            "Detectives believe the victim knew the offender.",
+        ],
     },
-    {
-        "category": "missing person",
-        "narratives": [
-            "32-year-old female never returned from late shift. Vehicle found at workplace, purse inside. No signs of struggle. Extensive search of surrounding area found no trace. Cell phone last pinged 2 miles south.",
-            "Father of three, 41, vanished during morning jog. Running shoes found on trail but no other evidence. No financial or marital problems known. Family offers $50,000 reward. Case active but no leads.",
-            "Teenager, 17, disappeared after leaving for friend's house. Friend claims he never arrived. Phone and wallet left at home. No history of running away. Family suspects foul play.",
-            "Elderly woman with dementia, 79, walked away from care facility. Last seen on security camera heading toward woods. Extensive search found no trace. Foul play not ruled out due to missing woman in past.",
-            "Truck driver, 38, last seen at weigh station. Truck found abandoned 200 miles away, cargo intact. No use of credit cards or phone. Wife reports no problems at home. Voluntarily missing or foul play unknown."
-        ]
+    "missing person": {
+        "last_seen": [
+            "never returned home after a late shift",
+            "was last seen leaving a grocery store",
+            "disappeared after dropping children at school",
+            "was last seen boarding a regional bus",
+            "vanished after a family dinner",
+            "did not show up for work on a Monday",
+            "was last seen walking near a lakeside trail",
+            "left a friend's apartment and was not heard from again",
+            "was last seen at a gas station on camera",
+        ],
+        "evidence": [
+            "Vehicle was found at the workplace with keys inside",
+            "Phone was found switched off at home",
+            "Bank accounts have not been accessed since",
+            "A search of the surrounding area found no trace",
+            "Last phone signal came from a tower several miles away",
+            "Personal belongings were left behind, including medication",
+            "A neighbor reported hearing an argument that night",
+        ],
+        "background": [
+            "Family reports no known financial problems",
+            "Had recently ended a relationship",
+            "Had a history of short absences but always stayed in contact",
+            "Was described as reliable and routine-driven",
+            "Had moved to the area less than a year earlier",
+            "Was caring for an elderly parent",
+        ],
+        "status": [
+            "Foul play has not been ruled out.",
+            "Family is offering a reward for information.",
+            "Case remains open with no active leads.",
+            "Investigators consider the disappearance suspicious.",
+            "Tips received so far have not been confirmed.",
+        ],
     },
-    {
-        "category": "robbery",
-        "narratives": [
-            "Armed robbery of jewelry store leaves owner in critical condition. Three masked suspects with handguns. $500,000 in merchandise taken. Getaway vehicle found burned. Professional crew suspected.",
-            "Bank robbery results in death of security guard. Lone suspect demanded cash, shot guard when he reached for alarm. $45,000 taken. Suspect fled in stolen vehicle. DNA recovered from discarded mask.",
-            "Armored car ambushed during ATM service. Two guards killed, one wounded. $2.3 million taken. Suspects used spike strips and heavy weapons. Inside information suspected. FBI involved.",
-            "Home invasion robbery of known drug dealer leaves 3 dead. Victims were dealer, girlfriend, and associate. Large quantity of cash and drugs taken. Rival gang or robbery crew unknown.",
-            "Casino employee robbed and murdered while transporting chips. Body found in parking garage, $200,000 in chips missing. Inside job suspected. Employee had gambling debts."
-        ]
+    "robbery": {
+        "event": [
+            "Armed robbery of a convenience store late at night",
+            "Robbery of a pharmacy shortly before closing",
+            "Takeover robbery of a credit union branch",
+            "Robbery of a delivery driver during a route stop",
+            "Robbery of a jewelry store during business hours",
+            "Robbery of a check-cashing business",
+            "Robbery of a restaurant manager making a bank deposit",
+            "Robbery of a cash-in-transit courier at a strip mall",
+        ],
+        "suspects": [
+            "A single masked suspect displayed a handgun",
+            "Two suspects in hooded sweatshirts were involved",
+            "Three suspects wearing gloves and masks entered together",
+            "Suspect passed a note demanding cash",
+            "Suspect posed as a customer before drawing a weapon",
+        ],
+        "outcome": [
+            "An employee was injured during the robbery",
+            "No one was physically harmed",
+            "A bystander was struck while the suspects fled",
+            "A security guard was wounded",
+            "The clerk was locked in a back room",
+        ],
+        "evidence": [
+            "Getaway vehicle was found abandoned and burned",
+            "Partial fingerprints were lifted from the counter",
+            "Surveillance cameras had been disabled beforehand",
+            "A discarded glove was recovered nearby",
+            "Witnesses gave conflicting descriptions of the vehicle",
+        ],
+        "status": [
+            "Inside information is suspected.",
+            "No arrests have been made.",
+            "Stolen property has not surfaced.",
+            "Investigators have no named suspect.",
+        ],
     },
-    {
-        "category": "sexual assault",
-        "narratives": [
-            "Woman attacked while walking dog in park at dusk. Suspect wore mask, fled when victim screamed. Partial DNA recovered. Similar attacks reported in neighboring counties over past 2 years.",
-            "Home invasion sexual assault. Suspect entered through basement window while victim slept alone. Attacked victim in bedroom. Fled when motion light activated. Left behind glove with DNA.",
-            "Multiple victims report attacks by suspect using dating app. Victims drugged then assaulted. 4 victims in 6 months. Same suspect description. App account traced to burner phone.",
-            "College student assaulted at off-campus party. Victim was drugged. Woke in unfamiliar location. Limited memory of attack. Suspect may have recorded assault. Investigation ongoing.",
-            "Serial assailant targeting women in apartment complex. 3 attacks in 4 months. Suspect has key or picks locks. Attacks occur when victims are alone. No DNA left at scenes."
-        ]
-    }
-]
+    "sexual assault": {
+        "event": [
+            "Woman assaulted while walking to her car after work",
+            "Assault reported after a victim accepted a ride home",
+            "Victim assaulted in a stairwell of her apartment building",
+            "Assault reported following a first date arranged online",
+            "Victim attacked on a jogging path in the early morning",
+            "Assault reported after a house party",
+        ],
+        "suspect": [
+            "Suspect was described as a stranger wearing dark clothing",
+            "Suspect used a false name and a prepaid phone",
+            "Victim did not see the suspect's face",
+            "Suspect fled when a passerby approached",
+            "Suspect was known to the victim only by a nickname",
+        ],
+        "evidence": [
+            "A forensic exam was completed and the kit was submitted for testing",
+            "No DNA was recovered",
+            "A partial DNA profile was developed but has no database match",
+            "Nearby cameras were not working",
+            "Phone records are under review",
+        ],
+        "status": [
+            "Case remains open.",
+            "Investigators are reviewing the case with new testing methods.",
+            "No similar reports were found in the area.",
+            "Victim continues to cooperate with detectives.",
+        ],
+    },
+}
+
+BACKGROUND_CATEGORIES = list(BACKGROUND_PARTS)
+
+
+def random_background_narrative(category):
+    p = BACKGROUND_PARTS[category]
+    age = random.randint(19, 74)
+    sex = random.choice(SEXES)
+    if category == "homicide":
+        return (f"Body of {sex} victim, approximately {age} years old, {random.choice(p['found'])}. "
+                f"{random.choice(p['cause'])}. {random.choice(p['detail'])}. {random.choice(p['status'])}")
+    if category == "missing person":
+        return (f"{age}-year-old {sex} {random.choice(p['last_seen'])}. {random.choice(p['evidence'])}. "
+                f"{random.choice(p['background'])}. {random.choice(p['status'])}")
+    if category == "robbery":
+        return (f"{random.choice(p['event'])}. {random.choice(p['suspects'])}. "
+                f"{random.choice(p['outcome'])}. {random.choice(p['evidence'])}. {random.choice(p['status'])}")
+    return (f"{random.choice(p['event'])}. Victim is {age} years old. {random.choice(p['suspect'])}. "
+            f"{random.choice(p['evidence'])}. {random.choice(p['status'])}")
 
 
 def random_location_near_city(city, spread_km=50):
@@ -370,8 +504,8 @@ def generate_cases():
         city = random.choice(CITIES)
         lat, lon = random_location_near_city(city, spread_km=30)
         
-        template_group = random.choice(RANDOM_CASE_TEMPLATES)
-        narrative = random.choice(template_group['narratives'])
+        category = random.choice(BACKGROUND_CATEGORIES)
+        narrative = random_background_narrative(category)
         
         case = {
             "case_id": generate_case_id(case_index),
@@ -379,7 +513,7 @@ def generate_cases():
             "lat": lat,
             "lon": lon,
             "narrative": narrative,
-            "category": template_group['category'],
+            "category": category,
             "weapon": random.choice(["handgun", "knife", "blunt object", "ligature", "unknown", ""]),
             "entry_method": random.choice(["forced entry", "unlocked", "window", "picked lock", "unknown", ""]),
             "tool_used": random.choice(["pry bar", "lock picks", "cutting tool", ""]),
@@ -394,6 +528,10 @@ def generate_cases():
 
 
 def main():
+    # Optional seed for a reproducible dataset: python generate_cases.py 42
+    import sys
+    if len(sys.argv) > 1:
+        random.seed(int(sys.argv[1]))
     cases = generate_cases()
     
     # Write to CSV
