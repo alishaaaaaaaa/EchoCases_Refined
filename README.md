@@ -77,15 +77,20 @@ npm start
 
 **Evaluation**
 
-`generate_cases.py` plants 10 series among 150 unlinked background cases. To score series detection against them:
+`generate_cases.py` plants 10 series among 150 unlinked background cases (each with a distinct narrative). To score series detection against them:
 
 ```
 cd backend
-python generate_cases.py            # writes cases.csv
-python evaluate_clustering.py       # report + eval_results.json
-python evaluate_clustering.py --sweep     # compare HDBSCAN settings
+python generate_cases.py                  # writes cases.csv (add a number to fix the seed)
+python evaluate_clustering.py             # report on cases.csv
 python evaluate_clustering.py --seeds 5   # average over 5 regenerated datasets
+python evaluate_clustering.py --compare   # choose pipeline settings, save cluster_config.json
+python evaluate_clustering.py --retrieval # score the similar-case search behind RAG
 ```
+
+`--compare` tries combinations of embedding text (narrative alone, or with category, weapon and entry method), PCA dimension reduction and HDBSCAN settings on 5 tuning datasets, then reports the winner and the default on 5 held-out datasets that played no part in the choice. If the winner is better on held-out data it is saved to `cluster_config.json`, which the app loads at startup.
+
+`--retrieval` scores the similar-case search that supplies RAG context. Each case in a planted series is used as a query, every other case is ranked by cosine similarity (as the app does), and it reports precision@k (share of the top k results from the same series), recall@k and MRR, alongside the random-ranking baseline and the best score possible given series sizes. It runs on the held-out datasets by default.
 
 A series counts as *recovered* when one cluster holds a majority of its cases and that cluster is mostly that series. Pairwise precision is the share of case pairs put in the same cluster that truly belong to the same series; pairwise recall is the share of same-series pairs that were put together. With the backend running, `GET /api/evaluation` returns the same metrics for the loaded dataset.
 

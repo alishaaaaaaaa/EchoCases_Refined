@@ -3,4 +3,5 @@ __pycache__/
 *.pyc
 .env
 cases.csv
-*.dbeval_results.json
+*.db
+eval_results.json
