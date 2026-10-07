@@ -23,6 +23,8 @@ Its core features include:
 
 - **Measured Clustering Quality**: The synthetic dataset plants 10 known crime series, so series detection is scored against ground truth: how many series are recovered, plus pairwise precision, recall and F1 (see *Evaluation* below).
 
+- **Authentication & Role-Based Access**: Case data is behind a login. Investigators can view cases and run analysis; only admins can upload datasets, manage accounts and read the audit log. Every access is audit-logged (see *Security* below).
+
 - **Dual Interface Modes**:  Switch between Tactical (hacker aesthetic) and Standard (government/professional) themes.
 
 - **Temporal Animation**: An animated timeline reveals how cases unfold over time, exposing escalation patterns and cooling-off periods that might indicate serial behavior
@@ -62,7 +64,11 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# Add your API keys
+# Add your Gemini key, and set ECHOCASES_SECRET_KEY to the output of:
+python -c "import secrets; print(secrets.token_hex(32))"
+
+# Create the first admin account (you'll be asked for a password)
+python manage_users.py create yourname --role admin
 
 python app.py
 
@@ -98,8 +104,31 @@ A series counts as *recovered* when one cluster holds a majority of its cases an
 - `GET /api/analyze/<case_id>?k=5`: RAG analysis; `k` sets how many retrieved cases go into the prompt. Set `GEMINI_MODEL` in `.env` to change the Gemini model.
 - `GET /api/evaluation`: clustering metrics against the planted series.
 
+**Security**
+
+- **Login required.** Every `/api` route except login needs a signed JWT (`Authorization: Bearer <token>`), which expires after 8 hours. Passwords are stored salted and hashed (scrypt); there is no public sign-up.
+- **Two roles.** `investigator`: view cases, similar cases, clusters, AI analysis. `admin`: everything an investigator can do, plus dataset upload, user management (`/api/admin/users`) and the audit log (`/api/admin/audit`).
+- **Immediate revocation.** The user is re-checked on every request, so deactivating an account, changing a role or resetting a password takes effect at once; password resets and deactivation invalidate existing tokens.
+- **Login throttling.** 5 failed attempts for a username from one IP locks that pair out for 15 minutes.
+- **Audit log.** Every API request (allowed or denied), login, failed login and lockout is recorded with user, role, action, case ID, status and IP.
+- **Locked-down CORS.** Only origins listed in `ALLOWED_ORIGINS` can call the API from a browser.
+- **Upload checks.** Admin-only, `.csv` only, size-capped (`MAX_UPLOAD_MB`), and rejected if required columns are missing.
+- **Safer defaults.** The Flask debugger is off unless `FLASK_DEBUG=1`; API responses are sent with `no-store` and other security headers; the app refuses to start without a strong `ECHOCASES_SECRET_KEY`.
+
+Manage accounts from `backend/`:
+
+```
+python manage_users.py create <name> --role investigator
+python manage_users.py list
+python manage_users.py set-password <name>
+python manage_users.py set-role <name> admin
+python manage_users.py deactivate <name>
+```
+
+Known limits for a real deployment: serve over HTTPS, move users and the audit log to a managed database, and keep the token out of reach of injected scripts (an HttpOnly cookie is the next step up from sessionStorage).
+
 **Usage**
-1. Upload your dataset
+1. Sign in; an admin uploads the dataset
 2. Explore cases on the map
 3. View pattern matches
 4. Request AI analysis
