@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.pyc
+.env
+cases.csv
+*.db
+eval_results.json

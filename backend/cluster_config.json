@@ -1,0 +1,9 @@
+{
+  "text": "narrative+fields",
+  "reduce_dims": 50,
+  "min_cluster_size": 3,
+  "min_samples": 1,
+  "cluster_selection_method": "leaf",
+  "held_out_series_recall": 0.56,
+  "held_out_pairwise_f1": 0.208
+}
