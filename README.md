@@ -3,9 +3,9 @@
 ## The Problem 
 The clearance rate for violent crime in North America is only about 50%,  but for minority and underserved communities, clearance rates are often lower due to case deprioritization and limited investigative resources. As a result, many families are left without answers for years, sometimes decades.
 
-## We built EchoCases to change that 
+## EchoCases was Built to change that 
 
-Our mission is to democratize investigative intelligence, giving community advocates, independent researchers, and under-resourced agencies the same pattern-recognition capabilities that well-funded departments take for granted. By making cold case analysis 10x more efficient, we aim to give voice to the voiceless and bring attention back to the cases that have been forgotten.
+The mission of EchoCases is to democratize investigative intelligence, giving community advocates, independent researchers, and under-resourced agencies the same pattern-recognition capabilities that well-funded departments take for granted. By making cold case analysis 10x more efficient, EchoCases aims to give voice to the voiceless and bring attention back to the cases that have been forgotten.
 
 
 ## What it does
@@ -30,7 +30,7 @@ Its core features include:
 - **Temporal Animation**: An animated timeline reveals how cases unfold over time, exposing escalation patterns and cooling-off periods that might indicate serial behavior
 
 
-## How we built it
+## How it was Built
 EchoCases is a full-stack application built on a technology stack that supports scalable analysis and interactive visualization. 
 
 ### The tech stack
